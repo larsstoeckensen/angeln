@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Angeltagebuch</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1e14;
+      color: #d4e8d0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #162a1c;
+      border-bottom: 1px solid #2a4a30;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 1.05rem; font-weight: 600; color: #7ec87e; letter-spacing: .03em; }
+    header span { font-size: .8rem; color: #5a8a5a; margin-left: auto; }
+
+    #setup-banner {
+      background: #2a1e08; border-bottom: 1px solid #5a3a08;
+      padding: 8px 16px; font-size: .82rem; color: #d4a840;
+      display: none; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    #setup-banner.visible { display: flex; }
+
+    /* ── Layout ── */
+    main { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+    #map { flex: 1; min-width: 0; overflow: hidden; cursor: crosshair; }
+
+    aside {
+      width: 300px; background: #162a1c;
+      border-left: 1px solid #2a4a30;
+      display: flex; flex-direction: column;
+      overflow: hidden; flex-shrink: 0;
+    }
+
+    .sidebar-section { padding: 14px 16px; border-bottom: 1px solid #2a4a30; flex-shrink: 0; }
+    .sidebar-section h2 { font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: #5a8a5a; margin-bottom: 10px; }
+
+    #spot-info { font-size: .82rem; color: #a0c8a0; line-height: 1.5; }
+    #spot-info strong { color: #7ec87e; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 14px; border: none; border-radius: 6px;
+      font-size: .83rem; font-weight: 500; cursor: pointer;
+      transition: background .15s, transform .1s; text-align: center;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: #3a7a3a; color: #e8f5e8; width: 100%; margin-top: 8px; font-size: .9rem; padding: 10px; }
+    .btn-primary:hover { background: #4a9a4a; }
+    .btn-primary:disabled { background: #2a4a2a; color: #5a7a5a; cursor: not-allowed; transform: none; }
+    .btn-gps { background: #1e3a28; color: #7ec87e; border: 1px solid #2a5a2a; width: 100%; }
+    .btn-gps:hover { background: #2a4a30; }
+    .btn-gps-sm { background: #1e3a28; color: #7ec87e; border: 1px solid #2a5a2a; padding: 6px 10px; font-size: .78rem; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
+    .btn-gps-sm:hover { background: #2a4a30; }
+
+    /* ── Forms ── */
+    .form-group { margin-bottom: 10px; }
+    label { display: block; font-size: .75rem; color: #5a8a5a; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .06em; }
+    select, input[type="text"], input[type="number"], textarea, input[type="datetime-local"] {
+      width: 100%; background: #0f1e14; border: 1px solid #2a4a30; color: #d4e8d0;
+      padding: 8px 10px; border-radius: 6px; font-size: .84rem; outline: none;
+      transition: border-color .15s; appearance: none; -webkit-appearance: none;
+    }
+    select:focus, input:focus, textarea:focus { border-color: #4a8a4a; }
+    select option { background: #162a1c; }
+    textarea { resize: vertical; min-height: 60px; }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    /* GPS / Spot in modal */
+    .modal-spot-row {
+      display: flex; align-items: center; gap: 8px;
+      background: #0a1710; border: 1px solid #2a4a2a;
+      border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;
+    }
+    .modal-spot-row .spot-coords {
+      flex: 1; font-size: .82rem; line-height: 1.5; color: #a0c8a0;
+    }
+    .modal-spot-row .spot-coords strong { color: #7ec87e; display: block; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 2px; }
+    .modal-spot-row .spot-coords em { color: #4a7a4a; font-style: normal; font-size: .78rem; }
+
+    /* auto-field (read-only weather) */
+    .auto-field {
+      background: #0a1710; border: 1px solid #1e3a22; color: #7ec87e;
+      padding: 8px 10px; border-radius: 6px; font-size: .84rem;
+      display: flex; align-items: center; gap: 5px; min-height: 36px;
+    }
+    .auto-field .val { font-weight: 600; }
+    .auto-field .unit { color: #4a7a4a; font-size: .76rem; }
+
+    /* lure chips */
+    .lure-section { margin-bottom: 10px; }
+    .lure-section-label { font-size: .72rem; color: #4a6a4a; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .06em; }
+    #lure-chips { display: flex; flex-wrap: wrap; gap: 5px; max-height: 90px; overflow-y: auto; }
+    #lure-chips::-webkit-scrollbar { width: 3px; }
+    #lure-chips::-webkit-scrollbar-thumb { background: #2a4a30; border-radius: 2px; }
+    .lure-chip {
+      background: #1a3424; border: 1px solid #2a5a30; color: #a0d4a0;
+      padding: 4px 10px; border-radius: 12px; font-size: .74rem; cursor: pointer;
+      transition: background .12s; white-space: nowrap;
+    }
+    .lure-chip:hover { background: #2a4a30; border-color: #4a7a4a; }
+    .lure-chip.active { background: #2a5a2a; border-color: #5a9a5a; color: #c8f0c8; }
+
+    /* log list */
+    #log-list { flex: 1; overflow-y: auto; padding: 8px; -webkit-overflow-scrolling: touch; }
+    #log-list::-webkit-scrollbar { width: 4px; }
+    #log-list::-webkit-scrollbar-thumb { background: #2a4a30; border-radius: 2px; }
+
+    .log-entry {
+      background: #0f1e14; border: 1px solid #2a4a30; border-radius: 8px;
+      padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+      transition: border-color .15s; position: relative;
+    }
+    .log-entry:hover { border-color: #4a7a4a; }
+    .log-entry .fish-name { font-weight: 600; font-size: .9rem; color: #7ec87e; margin-bottom: 4px; padding-right: 20px; }
+    .log-entry .meta { font-size: .75rem; color: #5a7a5a; line-height: 1.7; }
+    .log-entry .delete-btn {
+      position: absolute; top: 8px; right: 8px; background: none; border: none;
+      color: #5a3a3a; cursor: pointer; font-size: .9rem; padding: 4px 6px;
+      border-radius: 4px; line-height: 1;
+    }
+    .log-entry .delete-btn:hover { color: #c05050; background: #2a1a1a; }
+
+    .empty-state { text-align: center; color: #3a5a3a; font-size: .82rem; padding: 30px 10px; line-height: 1.6; }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.75); z-index: 1000;
+      align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #162a1c; border: 1px solid #2a5a2a; border-radius: 12px;
+      width: 100%; max-width: 440px; max-height: calc(100dvh - 32px);
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.7);
+    }
+    .modal h2 { font-size: 1rem; color: #7ec87e; margin-bottom: 14px; }
+    .modal-section-divider {
+      font-size: .72rem; text-transform: uppercase; letter-spacing: .08em;
+      color: #3a5a3a; margin: 14px 0 10px;
+      border-top: 1px solid #1e3a22; padding-top: 10px;
+    }
+    .modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .btn-cancel { background: #1e3a28; color: #7a9a7a; border: 1px solid #2a4a30; flex: 1; }
+    .btn-cancel:hover { background: #2a4a30; }
+    .btn-save { background: #3a7a3a; color: #e8f5e8; flex: 2; }
+    .btn-save:hover { background: #4a9a4a; }
+
+    /* Leaflet */
+    .leaflet-popup-content-wrapper { background: #162a1c; color: #d4e8d0; border: 1px solid #2a5a2a; border-radius: 8px; }
+    .leaflet-popup-tip { background: #162a1c; }
+    .leaflet-popup-content { font-size: .82rem; line-height: 1.6; }
+    .popup-title { font-weight: 700; color: #7ec87e; margin-bottom: 4px; font-size: .9rem; }
+
+    /* Photo */
+    .file-btn {
+      display: flex; align-items: center; gap: 8px;
+      background: #1e3a28; border: 1px dashed #2a5a30; color: #7ec87e;
+      padding: 9px 12px; border-radius: 6px; font-size: .84rem;
+      cursor: pointer; width: 100%; transition: background .15s;
+    }
+    .file-btn:hover { background: #2a4a30; }
+    #photo-preview { margin-top: 8px; position: relative; }
+    #photo-preview img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 6px; display: block; }
+    #photo-preview .remove-photo {
+      position: absolute; top: 6px; right: 6px;
+      background: rgba(0,0,0,.6); color: #fff; border: none;
+      border-radius: 50%; width: 22px; height: 22px; font-size: .75rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .entry-photo { width: 100%; max-height: 120px; object-fit: cover; border-radius: 4px; margin-top: 6px; display: block; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #2a5a2a; color: #d4e8d0;
+      padding: 10px 18px; border-radius: 20px;
+      font-size: .84rem; z-index: 2000;
+      transition: transform .3s; pointer-events: none;
+      max-width: 85vw; text-align: center; word-break: break-word;
+      line-height: 1.4;
+    }
+    #toast.error { background: #5a2020; }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    .spinner {
+      display: inline-block; width: 12px; height: 12px;
+      border: 2px solid #5a8a5a; border-top-color: #7ec87e;
+      border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Detail-Panel ── */
+    .detail-modal {
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100dvh - 32px);
+    }
+    .detail-topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 18px 14px;
+      flex-shrink: 0;
+      border-bottom: 1px solid #1e3a22;
+    }
+    .detail-species {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #7ec87e;
+      line-height: 1.2;
+    }
+    .detail-measures {
+      font-size: .85rem;
+      color: #5a8a5a;
+      margin-top: 3px;
+    }
+    .detail-close {
+      background: #1e3a28;
+      border: 1px solid #2a5a2a;
+      color: #7ec87e;
+      border-radius: 50%;
+      width: 30px; height: 30px;
+      font-size: .9rem;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .detail-photo {
+      width: 100%;
+      max-height: 240px;
+      object-fit: cover;
+      display: block;
+      cursor: zoom-in;
+      flex-shrink: 0;
+    }
+    .detail-rows {
+      padding: 12px 18px 18px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      flex: 1;
+    }
+    .detail-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 8px 0;
+      border-bottom: 1px solid #1a3020;
+      font-size: .88rem;
+      color: #b0d4b0;
+      line-height: 1.4;
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .dr-icon { font-size: 1rem; flex-shrink: 0; width: 20px; text-align: center; margin-top: 1px; }
+    .dr-val  { flex: 1; }
+
+    /* auf mobile: Bottom-Sheet wie das Form-Modal */
+    @media (max-width: 640px) {
+      .detail-modal {
+        border-radius: 16px 16px 0 0;
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        max-height: 88dvh;
+      }
+    }
+
+    /* ── Live-Standort-Puls ── */
+    @keyframes loc-pulse {
+      0%   { transform: scale(1);   opacity: .5; }
+      70%  { transform: scale(2.4); opacity: 0; }
+      100% { transform: scale(2.4); opacity: 0; }
+    }
+    .my-location-dot {
+      position: relative; width: 16px; height: 16px;
+    }
+    .my-location-dot::before {
+      content: ''; position: absolute;
+      inset: 0; border-radius: 50%;
+      background: #4a8fe8;
+      animation: loc-pulse 2s ease-out infinite;
+    }
+    .my-location-dot::after {
+      content: ''; position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #4a8fe8;
+      border: 2px solid #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.5);
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 640px) {
+      /* 100vw = exakt Viewport-Breite, unabhängig vom Elternelement */
+      html {
+        max-width: 100vw;
+        overflow-x: hidden;
+      }
+      body {
+        width: 100vw;
+        max-width: 100vw;
+        overflow-x: hidden;
+        overflow-y: auto;
+        height: auto;
+        min-height: 100dvh;
+        flex: none;
+      }
+
+      header {
+        width: 100vw;
+        max-width: 100vw;
+        padding: 8px 12px;
+        box-sizing: border-box;
+      }
+      header h1 { font-size: .88rem; }
+
+      main {
+        width: 100vw;
+        max-width: 100vw;
+        flex: none;
+        flex-direction: column;
+        height: auto;
+        overflow: hidden;
+        box-sizing: border-box;
+      }
+
+      #map {
+        width: 100vw;
+        max-width: 100vw;
+        flex: none;
+        height: 46vh;
+        overflow: hidden;
+      }
+
+      aside {
+        width: 100vw;
+        max-width: 100vw;
+        flex: none;
+        height: auto;
+        border-left: none;
+        border-top: 1px solid #2a4a30;
+        overflow: hidden;
+        box-sizing: border-box;
+      }
+
+      .sidebar-section { padding: 10px 12px; box-sizing: border-box; }
+      .sidebar-section:nth-child(2) { display: none; }
+      #log-list { overflow: visible; max-height: none; padding: 6px; box-sizing: border-box; }
+
+      /* Modals */
+      .modal-backdrop { padding: 0; align-items: flex-end; }
+      .modal {
+        border-radius: 16px 16px 0 0;
+        width: 100vw; max-width: 100vw;
+        height: 90dvh; max-height: 90dvh;
+        overflow-y: auto; -webkit-overflow-scrolling: touch;
+        box-sizing: border-box;
+      }
+      .detail-modal {
+        border-radius: 16px 16px 0 0;
+        width: 100vw; max-width: 100vw;
+        height: auto; max-height: 90dvh;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7ec87e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
+  </svg>
+  <h1>Angeltagebuch</h1>
+  <span id="catch-count">…</span>
+</header>
+
+<div id="setup-banner">
+  ⚠️ Supabase nicht konfiguriert
+</div>
+
+<main>
+  <div id="map"></div>
+
+  <aside>
+    <div class="sidebar-section">
+      <h2>Spot</h2>
+      <div id="spot-info">Karte antippen oder GPS nutzen.</div>
+      <button class="btn btn-gps" onclick="getGPS()" style="margin-top:8px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></svg>
+        GPS
+      </button>
+      <button class="btn btn-primary" id="add-btn" onclick="openModal()">🐟 Fang eintragen</button>
+    </div>
+
+    <div class="sidebar-section" style="padding-bottom:6px">
+      <h2>Fangbuch</h2>
+    </div>
+    <div id="log-list"></div>
+  </aside>
+</main>
+
+<!-- ── Modal ──────────────────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h2>🐟 Fang dokumentieren</h2>
+
+    <!-- 1. Standort (immer zuerst) -->
+    <div class="modal-spot-row">
+      <div class="spot-coords">
+        <strong>📍 Standort</strong>
+        <span id="modal-spot-text">Kein Spot gewählt</span>
+      </div>
+      <button class="btn btn-gps-sm" onclick="modalGetGPS()">GPS aktuell.</button>
+    </div>
+
+    <div class="form-group">
+      <label>Spot-Name (optional)</label>
+      <input type="text" id="f-spotname" placeholder="z. B. Nordufer, Bootsanleger …" />
+    </div>
+
+    <!-- 2. Uhrzeit -->
+    <div class="form-group">
+      <label>Uhrzeit</label>
+      <input type="datetime-local" id="f-time" />
+    </div>
+
+    <!-- 3. Fischart & Maße -->
+    <div class="modal-section-divider">Fisch</div>
+
+    <div class="form-group">
+      <label>Fischart</label>
+      <select id="f-species">
+        <option value="">– bitte wählen –</option>
+        <option>Hecht</option>
+        <option>Barsch</option>
+        <option>Zander</option>
+      </select>
+    </div>
+
+    <div class="row-2">
+      <div class="form-group">
+        <label>Gewicht (g)</label>
+        <input type="number" id="f-weight" placeholder="850" min="0" />
+      </div>
+      <div class="form-group">
+        <label>Länge (cm)</label>
+        <input type="number" id="f-length" placeholder="42" min="0" step="0.5" />
+      </div>
+    </div>
+
+    <!-- 4. Köder -->
+    <div class="modal-section-divider">Köder</div>
+
+    <div class="form-group">
+      <label>Köder wählen oder Typ + Name neu eingeben</label>
+      <select id="f-bait-type" onchange="onBaitSelectChange()">
+        <option value="">– bitte wählen –</option>
+        <!-- Gespeicherte Köder werden hier dynamisch eingefügt -->
+        <optgroup label="Köder-Typ (neu)">
+          <option>Wobbler</option>
+          <option>Gummifisch</option>
+          <option>Spinner</option>
+          <option>Blinker</option>
+          <option>Jig</option>
+          <option>Popper</option>
+          <option>Twister</option>
+          <option>Crankbait</option>
+          <option>Swimbait</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Köder-Name</label>
+      <input type="text" id="f-bait-name" placeholder='z. B. "Rapala F11 Silber"' />
+    </div>
+
+    <!-- 5. Wetter & Temp -->
+    <div class="modal-section-divider">Wetter & Temperaturen</div>
+
+    <div class="form-group">
+      <label>Wetter</label>
+      <select id="f-weather">
+        <option value="">– bitte wählen –</option>
+        <option>☀️ Sonnig</option>
+        <option>⛅ Leicht bewölkt</option>
+        <option>☁️ Bewölkt</option>
+        <option>🌧️ Regen</option>
+        <option>⛈️ Gewitter</option>
+        <option>🌬️ Windig</option>
+        <option>🌫️ Nebel</option>
+        <option>❄️ Schnee</option>
+      </select>
+    </div>
+
+    <div class="row-2">
+      <div class="form-group">
+        <label>Außentemp. (auto)</label>
+        <div class="auto-field">
+          <span class="val" id="airtemp-val">–</span>
+          <span class="unit">°C</span>
+        </div>
+        <input type="hidden" id="f-airtemp" />
+      </div>
+      <div class="form-group">
+        <label>Wassertemp. (°C)</label>
+        <input type="number" id="f-watertemp" placeholder="manuell" min="0" max="35" step="0.5" />
+      </div>
+    </div>
+
+    <!-- 6. Notizen -->
+    <div class="form-group">
+      <label>Notizen</label>
+      <textarea id="f-notes" placeholder="Tiefe, Technik, Besonderheiten …"></textarea>
+    </div>
+
+    <!-- 7. Foto -->
+    <div class="form-group">
+      <label>Foto (optional)</label>
+      <label class="file-btn" for="f-photo">
+        📷 Foto aufnehmen oder auswählen
+      </label>
+      <input type="file" id="f-photo" accept="image/*" capture="environment" style="display:none" onchange="previewPhoto(this)" />
+      <div id="photo-preview" style="display:none">
+        <img id="photo-preview-img" src="" alt="Vorschau" />
+        <button class="remove-photo" onclick="clearPhoto()" title="Entfernen">✕</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="cancel-btn" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-save"   id="save-btn"   onclick="saveCatch()">💾 Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Detail-Panel ───────────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="detail-modal">
+  <div class="modal detail-modal">
+    <div class="detail-topbar">
+      <div>
+        <div class="detail-species" id="d-species"></div>
+        <div class="detail-measures" id="d-measures"></div>
+      </div>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+
+    <img id="d-photo" class="detail-photo" src="" alt="Fangfoto" style="display:none" onclick="window.open(this.src,'_blank')" />
+
+    <div class="detail-rows">
+      <div class="detail-row" id="d-time">
+        <span class="dr-icon">🕐</span><span class="dr-val"></span>
+      </div>
+      <div class="detail-row" id="d-spot">
+        <span class="dr-icon">📍</span><span class="dr-val"></span>
+      </div>
+      <div class="detail-row" id="d-bait">
+        <span class="dr-icon">🪱</span><span class="dr-val"></span>
+      </div>
+      <div class="detail-row" id="d-weather">
+        <span class="dr-icon">🌤</span><span class="dr-val"></span>
+      </div>
+      <div class="detail-row" id="d-temps">
+        <span class="dr-icon">🌡</span><span class="dr-val"></span>
+      </div>
+      <div class="detail-row" id="d-notes" style="display:none">
+        <span class="dr-icon">📝</span><span class="dr-val"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ── Supabase-Zugangsdaten ───────────────────────────────────────────────── -->
+<script>
+  const SUPABASE_URL      = 'https://uxenufbjbqphpuihuged.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4ZW51ZmJqYnFwaHB1aWh1Z2VkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjQwNzksImV4cCI6MjA5NDQwMDA3OX0.7_2Wpt36Kam2fGxq6oJ-T0P8RG9_Q36Q64hBrOP8cn0';
+</script>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+// ── Supabase ───────────────────────────────────────────────────────────────
+let db = null;
+const configured = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+if (configured) {
+  db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} else {
+  document.getElementById('setup-banner').classList.add('visible');
+}
+
+// ── Map ────────────────────────────────────────────────────────────────────
+const map = L.map('map', { center: [51.5, 10.5], zoom: 6 });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap', maxZoom: 19,
+}).addTo(map);
+
+new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById('map'));
+
+function fixMobileLayout() {
+  const W = window.innerWidth;
+  if (W >= 640) return;
+  const mapH = Math.round(window.innerHeight * 0.46);
+  const el = {
+    html:  document.documentElement,
+    body:  document.body,
+    main:  document.querySelector('main'),
+    map:   document.getElementById('map'),
+    aside: document.querySelector('aside'),
+  };
+  el.html.style.cssText  = 'overflow-x:hidden;max-width:' + W + 'px';
+  el.body.style.cssText += ';width:' + W + 'px;max-width:' + W + 'px;overflow-x:hidden;overflow-y:auto;height:auto';
+  el.main.style.cssText += ';width:' + W + 'px;max-width:' + W + 'px;flex-direction:column;height:auto;overflow:hidden';
+  el.map.style.cssText  += ';width:' + W + 'px;max-width:' + W + 'px;height:' + mapH + 'px;flex:none';
+  el.aside.style.cssText += ';width:' + W + 'px;max-width:' + W + 'px;height:auto;flex:none;border-left:none';
+  map.invalidateSize();
+}
+window.addEventListener('load', fixMobileLayout);
+window.addEventListener('resize', fixMobileLayout);
+fixMobileLayout();
+
+let selectedLat = null, selectedLng = null;
+let spotMarker = null;
+let catchMarkers = {};
+let catchData = {};   // id → catch-Objekt für Detail-Panel
+
+// ── Live-Standort ──────────────────────────────────────────────────────────
+let myLocationMarker = null;
+
+const myLocationIcon = L.divIcon({
+  className: '',
+  html: '<div class="my-location-dot"></div>',
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+});
+
+function startLocationWatch() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(
+    pos => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      if (!myLocationMarker) {
+        myLocationMarker = L.marker([lat, lng], {
+          icon: myLocationIcon,
+          zIndexOffset: 900,
+          interactive: false,
+        }).addTo(map);
+      } else {
+        myLocationMarker.setLatLng([lat, lng]);
+      }
+    },
+    null,
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+
+const spotIcon = L.divIcon({
+  className: '',
+  html: '<div style="width:14px;height:14px;border-radius:50%;background:#7ec87e;border:2px solid #fff;box-shadow:0 0 6px #7ec87e88"></div>',
+  iconSize: [14,14], iconAnchor: [7,7],
+});
+const SPECIES_STYLE = {
+  'Hecht':  { letter: 'H', bg: '#3a8a5a', glow: '#3a8a5a88' },
+  'Barsch': { letter: 'B', bg: '#c05030', glow: '#c0503088' },
+  'Zander': { letter: 'Z', bg: '#5060c0', glow: '#5060c088' },
+};
+
+function makeCatchIcon(species) {
+  const s = SPECIES_STYLE[species] || { letter: species?.[0]?.toUpperCase() || '?', bg: '#e8a030', glow: '#e8a03088' };
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:26px;height:26px;border-radius:50%;background:${s.bg};border:2px solid #fff;box-shadow:0 0 6px ${s.glow};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;font-family:system-ui">${s.letter}</div>`,
+    iconSize: [26, 26], iconAnchor: [13, 13],
+  });
+}
+
+map.on('click', e => setSpot(e.latlng.lat, e.latlng.lng));
+
+function setSpot(lat, lng, updateMap = false) {
+  selectedLat = lat; selectedLng = lng;
+  if (spotMarker) map.removeLayer(spotMarker);
+  spotMarker = L.marker([lat, lng], { icon: spotIcon }).addTo(map);
+  if (updateMap) map.flyTo([lat, lng], 15, { duration: 1 });
+
+  const coordStr = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  document.getElementById('spot-info').innerHTML = `<strong>Spot gewählt</strong><br>${coordStr}`;
+  document.getElementById('modal-spot-text').textContent = coordStr;
+}
+
+// ── GPS ────────────────────────────────────────────────────────────────────
+function getGPS() {
+  if (!navigator.geolocation) { toast('GPS nicht verfügbar', true); return; }
+  toast('Standort wird ermittelt …');
+  navigator.geolocation.getCurrentPosition(
+    pos => { setSpot(pos.coords.latitude, pos.coords.longitude, true); toast('Standort gefunden!'); },
+    () => toast('GPS-Fehler – Berechtigung verweigert?', true)
+  );
+}
+
+function modalGetGPS() {
+  if (!navigator.geolocation) { toast('GPS nicht verfügbar', true); return; }
+  document.getElementById('modal-spot-text').textContent = 'Wird ermittelt …';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      setSpot(pos.coords.latitude, pos.coords.longitude, true);
+      fetchWeather(pos.coords.latitude, pos.coords.longitude).then(setWeatherDisplay);
+      toast('Standort aktualisiert!');
+    },
+    () => {
+      document.getElementById('modal-spot-text').textContent = 'GPS-Fehler';
+      toast('GPS-Fehler', true);
+    }
+  );
+}
+
+// ── Weather API ────────────────────────────────────────────────────────────
+async function fetchWeather(lat, lng) {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m&timezone=auto`;
+    const data = await (await fetch(url)).json();
+    return { airTemp: data.current.temperature_2m };
+  } catch { return null; }
+}
+
+function setWeatherDisplay(w) {
+  const val = w?.airTemp != null ? w.airTemp.toFixed(1) : '–';
+  document.getElementById('airtemp-val').textContent = val;
+  document.getElementById('f-airtemp').value = w?.airTemp ?? '';
+}
+
+// ── Lures ──────────────────────────────────────────────────────────────────
+let savedLures = [];
+
+async function loadLures() {
+  if (!configured) return;
+  const { data, error } = await db.from('lures').select('*').order('type').order('name');
+  if (error) {
+    console.error('Köder laden:', error);
+    toast('Köder-Fehler: ' + (error.message || error.code || JSON.stringify(error)), true);
+    return;
+  }
+  savedLures = data || [];
+  updateLureSelect();
+}
+
+function updateLureSelect() {
+  const sel = document.getElementById('f-bait-type');
+  // Altes "Meine Köder"-Optgroup entfernen falls vorhanden
+  sel.querySelector('optgroup[data-saved]')?.remove();
+  if (!savedLures.length) return;
+
+  const group = document.createElement('optgroup');
+  group.label = 'Meine Köder';
+  group.dataset.saved = '1';
+
+  savedLures.forEach(l => {
+    const opt = document.createElement('option');
+    opt.value = `saved::${l.type}::${l.name}`;
+    opt.textContent = `${l.type} – ${l.name}`;
+    group.appendChild(opt);
+  });
+
+  // Als erste Optgroup einfügen (nach der leeren Option)
+  sel.insertBefore(group, sel.querySelector('optgroup'));
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function onBaitSelectChange() {
+  const val = document.getElementById('f-bait-type').value;
+  if (val.startsWith('saved::')) {
+    const parts = val.split('::');          // ['saved', type, name]
+    document.getElementById('f-bait-name').value = parts[2];
+  } else {
+    document.getElementById('f-bait-name').value = '';
+    document.getElementById('f-bait-name').focus();
+  }
+}
+
+// Gibt den echten Typ zurück (egal ob gespeicherter Köder oder frisch gewählt)
+function resolvedBaitType() {
+  const val = document.getElementById('f-bait-type').value;
+  if (!val) return '';
+  if (val.startsWith('saved::')) return val.split('::')[1];
+  return val;
+}
+
+async function saveLureIfNew(type, name) {
+  if (!type || !name || !configured) return;
+  if (savedLures.some(l => l.type === type && l.name === name)) return;
+  const { data, error } = await db.from('lures').insert({ type, name }).select().single();
+  if (error) {
+    console.error('Köder speichern:', error);
+    toast('Köder konnte nicht gespeichert werden: ' + error.message, true);
+    return;
+  }
+  if (data) {
+    savedLures.push(data);
+    savedLures.sort((a,b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+    updateLureSelect();
+  }
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+async function openModal() {
+  // Lokale Systemzeit
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  document.getElementById('f-time').value =
+    `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  // Spot-Info im Modal aktualisieren
+  document.getElementById('modal-spot-text').textContent = selectedLat
+    ? `${selectedLat.toFixed(5)}, ${selectedLng.toFixed(5)}`
+    : 'Kein Spot gewählt – GPS-Button nutzen';
+
+  // Wetterdaten
+  document.getElementById('airtemp-val').textContent = '…';
+  if (selectedLat) {
+    fetchWeather(selectedLat, selectedLng).then(setWeatherDisplay);
+  } else {
+    document.getElementById('airtemp-val').textContent = '–';
+  }
+
+  await loadLures();
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+
+// ── Save ───────────────────────────────────────────────────────────────────
+async function saveCatch() {
+  const species  = document.getElementById('f-species').value;
+  const baitType = resolvedBaitType();
+  const baitName = document.getElementById('f-bait-name').value.trim();
+  const weather  = document.getElementById('f-weather').value;
+  const time     = document.getElementById('f-time').value;
+
+  if (!species)  { toast('Bitte Fischart wählen', true); return; }
+  if (!baitType) { toast('Bitte Köder-Typ wählen', true); return; }
+  if (!baitName) { toast('Bitte Köder-Namen eingeben', true); return; }
+  if (!weather)  { toast('Bitte Wetter wählen', true); return; }
+  if (!time)     { toast('Bitte Uhrzeit angeben', true); return; }
+
+  const entry = {
+    species,
+    bait_type:  baitType,
+    bait_name:  baitName,
+    weather,
+    time:       new Date(time).toISOString(),
+    weight:     parseInt(document.getElementById('f-weight').value)      || null,
+    length:     parseFloat(document.getElementById('f-length').value)    || null,
+    air_temp:   parseFloat(document.getElementById('f-airtemp').value)   || null,
+    watertemp:  parseFloat(document.getElementById('f-watertemp').value) || null,
+    spotname:   document.getElementById('f-spotname').value.trim()       || null,
+    notes:      document.getElementById('f-notes').value.trim()          || null,
+    lat: selectedLat,
+    lng: selectedLng,
+  };
+
+  setSaving(true);
+  if (!configured) { toast('Supabase nicht konfiguriert', true); setSaving(false); return; }
+
+  const photoFile = document.getElementById('f-photo').files[0];
+  const photoUrl  = await compressPhoto(photoFile);
+  if (photoUrl) entry.photo_url = photoUrl;
+
+  const { data, error } = await db.from('catches').insert(entry).select().single();
+  setSaving(false);
+
+  if (error) {
+    console.error(error);
+    toast('Fehler: ' + error.message, true);
+    return;
+  }
+
+  // Köder speichern (nach erfolgreichem Fang, nicht parallel)
+  await saveLureIfNew(baitType, baitName);
+
+  closeModal();
+  clearForm();
+  prependEntry(data);
+  if (data.lat) addMapMarker(data);
+  toast(`${data.species} gespeichert!`);
+}
+
+function setSaving(s) {
+  document.getElementById('save-btn').disabled = s;
+  document.getElementById('cancel-btn').disabled = s;
+  document.getElementById('save-btn').innerHTML = s ? '<span class="spinner"></span> Speichern…' : '💾 Speichern';
+}
+
+function clearForm() {
+  ['f-species','f-bait-type','f-bait-name','f-weather',
+   'f-weight','f-length','f-airtemp','f-watertemp','f-spotname','f-notes']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('airtemp-val').textContent = '–';
+  clearPhoto();
+}
+
+// ── Delete ─────────────────────────────────────────────────────────────────
+async function deleteCatch(id) {
+  if (!confirm('Diesen Fang wirklich löschen?')) return;
+  const { error } = await db.from('catches').delete().eq('id', id);
+  if (error) { toast('Fehler beim Löschen', true); return; }
+  if (catchMarkers[id]) { map.removeLayer(catchMarkers[id]); delete catchMarkers[id]; }
+  document.getElementById(`entry-${id}`)?.remove();
+  updateCount(-1);
+  toast('Fang gelöscht');
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function entryHTML(c) {
+  const d = new Date(c.time);
+  const dateStr = d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'2-digit' });
+  const timeStr = d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+
+  const bait = c.bait_name
+    ? `${c.bait_type ? c.bait_type + ' – ' : ''}${c.bait_name}`
+    : (c.bait || '–');
+
+  const measures = [c.weight ? `${c.weight} g` : '', c.length ? `${c.length} cm` : '']
+    .filter(Boolean).join(' · ');
+
+  const spotStr = c.spotname ? `📍 ${c.spotname}`
+    : (c.lat ? `📍 ${(+c.lat).toFixed(4)}, ${(+c.lng).toFixed(4)}` : '');
+
+  const temps = [
+    c.air_temp  != null ? `🌡 ${c.air_temp}°C`  : '',
+    c.watertemp != null ? `💧 ${c.watertemp}°C` : '',
+  ].filter(Boolean).join('  ');
+
+  return `
+    <div class="log-entry" id="entry-${c.id}" onclick="focusEntry(${c.id})">
+      <button class="delete-btn" onclick="event.stopPropagation();deleteCatch(${c.id})" title="Löschen">✕</button>
+      <div class="fish-name">${escHtml(c.species)}${measures ? ' · ' + measures : ''}</div>
+      <div class="meta">
+        🕐 ${dateStr} ${timeStr}<br>
+        🪱 ${escHtml(bait)}<br>
+        ${escHtml(c.weather)}${temps ? ' · ' + temps : ''}
+        ${spotStr ? '<br>' + escHtml(spotStr) : ''}
+        ${c.notes ? '<br>📝 ' + escHtml(c.notes) : ''}
+      </div>
+      ${c.photo_url ? `<img class="entry-photo" src="${c.photo_url}" alt="Fangfoto" loading="lazy" onclick="event.stopPropagation();window.open('${c.photo_url}','_blank')" />` : ''}
+    </div>`;
+}
+
+let totalCount = 0;
+
+function prependEntry(c) {
+  catchData[c.id] = c;
+  const el = document.getElementById('log-list');
+  el.querySelector('.empty-state')?.remove();
+  el.insertAdjacentHTML('afterbegin', entryHTML(c));
+  totalCount++;
+  updateCount(0);
+}
+
+function updateCount(delta) {
+  totalCount += delta;
+  document.getElementById('catch-count').textContent = `${totalCount} Fang${totalCount !== 1 ? 'e' : ''}`;
+}
+
+function focusEntry(id) {
+  const hasMaker = !!catchMarkers[id];
+  if (hasMaker) {
+    map.flyTo(catchMarkers[id].getLatLng(), 15, { duration: 1 });
+  }
+  // Auf Mobile: erst zur Karte scrollen, dann Detail öffnen
+  if (hasMaker && window.innerWidth <= 640) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => showDetail(id), 500);
+  } else {
+    showDetail(id);
+  }
+}
+
+// ── Map markers ────────────────────────────────────────────────────────────
+function addMapMarker(c) {
+  if (!c.lat) return;
+  catchData[c.id] = c;
+  const marker = L.marker([+c.lat, +c.lng], { icon: makeCatchIcon(c.species) })
+    .on('click', () => showDetail(c.id))
+    .addTo(map);
+  catchMarkers[c.id] = marker;
+}
+
+// ── Detail-Panel ──────────────────────────────────────────────────────────
+function showDetail(id) {
+  const c = catchData[id];
+  if (!c) return;
+
+  const d = new Date(c.time);
+  const dateStr = d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const timeStr = d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+
+  const bait = c.bait_name
+    ? `${c.bait_type ? c.bait_type + ' – ' : ''}${c.bait_name}`
+    : (c.bait || '–');
+
+  const measures = [
+    c.weight ? `${c.weight} g` : '',
+    c.length ? `${c.length} cm` : '',
+  ].filter(Boolean).join(' · ');
+
+  const temps = [
+    c.air_temp  != null ? `Luft ${c.air_temp} °C`   : '',
+    c.watertemp != null ? `Wasser ${c.watertemp} °C` : '',
+  ].filter(Boolean).join(' · ');
+
+  const spotText = c.spotname
+    ? (c.lat ? `${c.spotname} (${(+c.lat).toFixed(4)}, ${(+c.lng).toFixed(4)})` : c.spotname)
+    : (c.lat ? `${(+c.lat).toFixed(5)}, ${(+c.lng).toFixed(5)}` : '–');
+
+  document.getElementById('d-species').textContent  = c.species;
+  document.getElementById('d-measures').textContent = measures || '–';
+  document.querySelector('#d-time .dr-val').textContent    = `${dateStr}, ${timeStr} Uhr`;
+  document.querySelector('#d-spot .dr-val').textContent    = spotText;
+  document.querySelector('#d-bait .dr-val').textContent    = bait;
+  document.querySelector('#d-weather .dr-val').textContent = c.weather || '–';
+  document.querySelector('#d-temps .dr-val').textContent   = temps || '–';
+
+  const notesRow = document.getElementById('d-notes');
+  if (c.notes) {
+    notesRow.style.display = 'flex';
+    notesRow.querySelector('.dr-val').textContent = c.notes;
+  } else {
+    notesRow.style.display = 'none';
+  }
+
+  const photo = document.getElementById('d-photo');
+  if (c.photo_url) {
+    photo.src = c.photo_url;
+    photo.style.display = 'block';
+  } else {
+    photo.src = '';
+    photo.style.display = 'none';
+  }
+
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail-modal').classList.remove('open');
+}
+
+document.getElementById('detail-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('detail-modal')) closeDetail();
+});
+
+// ── Photo ──────────────────────────────────────────────────────────────────
+function previewPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('photo-preview-img').src = e.target.result;
+    document.getElementById('photo-preview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearPhoto() {
+  document.getElementById('f-photo').value = '';
+  document.getElementById('photo-preview').style.display = 'none';
+  document.getElementById('photo-preview-img').src = '';
+}
+
+async function compressPhoto(file) {
+  if (!file) return null;
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const maxW = 900;
+      const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.72));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.toggle('error', isError);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), isError ? 4000 : 2500);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+(async function init() {
+  startLocationWatch();
+
+  const el = document.getElementById('log-list');
+  if (!configured) {
+    el.innerHTML = '<div class="empty-state">Supabase konfigurieren,<br>dann Seite neu laden.</div>';
+    document.getElementById('catch-count').textContent = '–';
+    // Kein Supabase → auf GPS zentrieren
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => map.setView([pos.coords.latitude, pos.coords.longitude], 13), () => {});
+    }
+    return;
+  }
+
+  el.innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  const { data, error } = await db.from('catches').select('*').order('time', { ascending: false });
+
+  if (error) {
+    el.innerHTML = '<div class="empty-state">Fehler beim Laden.<br>Zugangsdaten prüfen.</div>';
+    console.error(error); return;
+  }
+
+  totalCount = data.length;
+  document.getElementById('catch-count').textContent = `${totalCount} Fang${totalCount !== 1 ? 'e' : ''}`;
+  data.forEach(c => { catchData[c.id] = c; });
+
+  el.innerHTML = data.length
+    ? data.map(entryHTML).join('')
+    : '<div class="empty-state">Noch keine Fänge.<br>Spot wählen → Fang eintragen.</div>';
+
+  data.forEach(addMapMarker);
+
+  // Karte auf Fänge mit GPS-Koordinaten zentrieren (+~10 km Puffer)
+  const withCoords = data.filter(c => c.lat && c.lng);
+  if (withCoords.length) {
+    const bounds = L.latLngBounds(withCoords.map(c => [+c.lat, +c.lng]));
+    const pad = 0.09; // ~10 km in Grad
+    map.fitBounds([
+      [bounds.getSouth() - pad, bounds.getWest() - pad],
+      [bounds.getNorth() + pad, bounds.getEast() + pad],
+    ]);
+  } else if (navigator.geolocation) {
+    // Keine Fänge mit Koordinaten → auf aktuellen Standort zentrieren
+    navigator.geolocation.getCurrentPosition(
+      pos => map.setView([pos.coords.latitude, pos.coords.longitude], 13), () => {});
+  }
+})();
+</script>
+</body>
+</html>
