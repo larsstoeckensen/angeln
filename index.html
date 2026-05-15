@@ -167,6 +167,45 @@
     .btn-cancel:hover { background: #2a4a30; }
     .btn-save { background: #3a7a3a; color: #e8f5e8; flex: 2; }
     .btn-save:hover { background: #4a9a4a; }
+    .btn-secondary { background: #1e3a28; color: #7ec87e; border: 1px solid #2a5a2a; flex: 1; font-size: .8rem; }
+    .btn-secondary:hover { background: #2a4a30; }
+    .btn-row-2 { display: flex; gap: 8px; margin-top: 8px; }
+
+    /* ── Toplist & Tipps ── */
+    .filter-bar { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filter-btn {
+      padding: 5px 12px; border-radius: 16px; border: 1px solid #2a5a2a;
+      background: #1e3a28; color: #7ec87e; font-size: .8rem; cursor: pointer;
+      transition: background .12s;
+    }
+    .filter-btn:hover { background: #2a4a30; }
+    .filter-btn.active { background: #3a7a3a; border-color: #5a9a5a; color: #e8f5e8; }
+
+    .top-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 0; border-bottom: 1px solid #1a3020;
+      font-size: .86rem; color: #b0d4b0;
+    }
+    .top-row:last-child { border-bottom: none; }
+    .top-rank { font-size: .75rem; color: #4a7a4a; width: 22px; flex-shrink: 0; text-align: right; }
+    .top-badge {
+      width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .top-info { flex: 1; }
+    .top-name { font-weight: 600; color: #d4e8d0; }
+    .top-meta { font-size: .76rem; color: #5a7a5a; margin-top: 2px; }
+    .top-size { font-size: .9rem; font-weight: 700; color: #7ec87e; text-align: right; flex-shrink: 0; }
+
+    .tip-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 0; border-bottom: 1px solid #1a3020; font-size: .86rem;
+    }
+    .tip-row:last-child { border-bottom: none; }
+    .tip-rank { font-size: .75rem; color: #4a7a4a; width: 18px; flex-shrink: 0; text-align: right; }
+    .tip-name { flex: 1; color: #d4e8d0; }
+    .tip-count { font-size: .78rem; color: #5a8a5a; flex-shrink: 0; }
 
     /* Leaflet */
     .leaflet-popup-content-wrapper { background: #162a1c; color: #d4e8d0; border: 1px solid #2a5a2a; border-radius: 8px; }
@@ -372,7 +411,8 @@
       }
 
       .sidebar-section { padding: 10px 12px; box-sizing: border-box; }
-      .sidebar-section:nth-child(2) { display: none; }
+      .sidebar-section:nth-child(2) { padding: 6px 12px; }
+      .sidebar-section:nth-child(2) h2 { display: none; }
       #log-list { overflow: visible; max-height: none; padding: 6px; box-sizing: border-box; }
 
       /* Modals */
@@ -422,6 +462,10 @@
 
     <div class="sidebar-section" style="padding-bottom:6px">
       <h2>Fangbuch</h2>
+      <div class="btn-row-2">
+        <button class="btn btn-secondary" onclick="openToplist()">🏆 Toplist</button>
+        <button class="btn btn-secondary" onclick="openTipps()">💡 Tipps jetzt</button>
+      </div>
     </div>
     <div id="log-list"></div>
   </aside>
@@ -485,15 +529,12 @@
         <option value="">– bitte wählen –</option>
         <!-- Gespeicherte Köder werden hier dynamisch eingefügt -->
         <optgroup label="Köder-Typ (neu)">
-          <option>Wobbler</option>
           <option>Gummifisch</option>
           <option>Spinner</option>
           <option>Blinker</option>
-          <option>Jig</option>
-          <option>Popper</option>
-          <option>Twister</option>
-          <option>Crankbait</option>
           <option>Swimbait</option>
+          <option>Wobbler</option>
+          <option>Topwater</option>
         </optgroup>
       </select>
     </div>
@@ -594,6 +635,35 @@
       <div class="detail-row" id="d-notes" style="display:none">
         <span class="dr-icon">📝</span><span class="dr-val"></span>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toplist ─────────────────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="toplist-modal">
+  <div class="modal">
+    <h2>🏆 Toplist – Größte Fänge</h2>
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="filterToplist('Alle')">Alle</button>
+      <button class="filter-btn" onclick="filterToplist('Hecht')">Hecht</button>
+      <button class="filter-btn" onclick="filterToplist('Barsch')">Barsch</button>
+      <button class="filter-btn" onclick="filterToplist('Zander')">Zander</button>
+    </div>
+    <div id="toplist-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeToplist()">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tipps für jetzt ────────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="tipps-modal">
+  <div class="modal">
+    <h2>💡 Tipps für jetzt</h2>
+    <p id="tipps-subtitle" style="font-size:.8rem;color:#5a8a5a;margin-bottom:12px"></p>
+    <div id="tipps-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeTipps()">Schließen</button>
     </div>
   </div>
 </div>
@@ -1122,6 +1192,101 @@ async function compressPhoto(file) {
     img.src = url;
   });
 }
+
+// ── Toplist ────────────────────────────────────────────────────────────────
+let toplistFilter = 'Alle';
+
+function openToplist() {
+  toplistFilter = 'Alle';
+  document.querySelectorAll('#toplist-modal .filter-btn').forEach(b => b.classList.toggle('active', b.textContent === 'Alle'));
+  renderToplist();
+  document.getElementById('toplist-modal').classList.add('open');
+}
+function closeToplist() { document.getElementById('toplist-modal').classList.remove('open'); }
+document.getElementById('toplist-modal').addEventListener('click', e => { if (e.target === document.getElementById('toplist-modal')) closeToplist(); });
+
+function filterToplist(species) {
+  toplistFilter = species;
+  document.querySelectorAll('#toplist-modal .filter-btn').forEach(b => b.classList.toggle('active', b.textContent === species));
+  renderToplist();
+}
+
+function renderToplist() {
+  const all = Object.values(catchData);
+  const filtered = toplistFilter === 'Alle' ? all : all.filter(c => c.species === toplistFilter);
+  const sorted = [...filtered].sort((a, b) => {
+    const wa = a.weight || 0, wb = b.weight || 0;
+    if (wb !== wa) return wb - wa;
+    return (b.length || 0) - (a.length || 0);
+  });
+  const body = document.getElementById('toplist-body');
+  if (!sorted.length) { body.innerHTML = '<div class="empty-state">Keine Fänge vorhanden.</div>'; return; }
+  body.innerHTML = sorted.map((c, i) => {
+    const s = SPECIES_STYLE[c.species] || { letter: c.species?.[0] || '?', bg: '#e8a030' };
+    const d = new Date(c.time);
+    const date = d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'2-digit' });
+    const size = c.weight ? `${c.weight} g` : (c.length ? `${c.length} cm` : '–');
+    const sub  = [c.length && c.weight ? `${c.length} cm` : '', date, c.spotname || ''].filter(Boolean).join(' · ');
+    const bait = c.bait_name ? `${c.bait_type ? c.bait_type + ' – ' : ''}${c.bait_name}` : '';
+    return `<div class="top-row">
+      <span class="top-rank">#${i+1}</span>
+      <span class="top-badge" style="background:${s.bg}">${s.letter}</span>
+      <div class="top-info">
+        <div class="top-name">${escHtml(c.species)}${bait ? ' <span style="color:#5a8a5a;font-weight:400">· ' + escHtml(bait) + '</span>' : ''}</div>
+        <div class="top-meta">${escHtml(sub)}</div>
+      </div>
+      <span class="top-size">${size}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Tipps für jetzt ────────────────────────────────────────────────────────
+function openTipps() {
+  const now  = new Date();
+  const hour = now.getHours();
+  const all  = Object.values(catchData);
+
+  // Fänge innerhalb ±1h der aktuellen Uhrzeit (tagesunabhängig)
+  const relevant = all.filter(c => {
+    const h = new Date(c.time).getHours();
+    const diff = Math.abs(h - hour);
+    return diff <= 1 || diff >= 23; // wrap-around Mitternacht
+  });
+
+  const sub = document.getElementById('tipps-subtitle');
+  sub.textContent = `Fänge zwischen ${String((hour+23)%24).padStart(2,'0')}:00 und ${String((hour+1)%24).padStart(2,'0')}:59 Uhr (${relevant.length} Fang${relevant.length !== 1 ? 'e' : ''})`;
+
+  const body = document.getElementById('tipps-body');
+  if (!relevant.length) {
+    body.innerHTML = '<div class="empty-state">Keine Fänge zu dieser Uhrzeit vorhanden.</div>';
+    document.getElementById('tipps-modal').classList.add('open');
+    return;
+  }
+
+  // Köder zählen
+  const counts = {};
+  relevant.forEach(c => {
+    if (!c.bait_name) return;
+    const key = `${c.bait_type || ''}::${c.bait_name}`;
+    counts[key] = (counts[key] || { type: c.bait_type, name: c.bait_name, n: 0 });
+    counts[key].n++;
+  });
+
+  const ranked = Object.values(counts).sort((a, b) => b.n - a.n);
+  if (!ranked.length) {
+    body.innerHTML = '<div class="empty-state">Keine Köder-Daten für diese Uhrzeit.</div>';
+  } else {
+    body.innerHTML = ranked.map((r, i) => `
+      <div class="tip-row">
+        <span class="tip-rank">#${i+1}</span>
+        <span class="tip-name">${escHtml(r.type ? r.type + ' – ' + r.name : r.name)}</span>
+        <span class="tip-count">${r.n}× gefangen</span>
+      </div>`).join('');
+  }
+  document.getElementById('tipps-modal').classList.add('open');
+}
+function closeTipps() { document.getElementById('tipps-modal').classList.remove('open'); }
+document.getElementById('tipps-modal').addEventListener('click', e => { if (e.target === document.getElementById('tipps-modal')) closeTipps(); });
 
 // ── Toast ──────────────────────────────────────────────────────────────────
 let toastTimer;
