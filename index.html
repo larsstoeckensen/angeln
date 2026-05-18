@@ -490,7 +490,13 @@
       <input type="text" id="f-spotname" placeholder="z. B. Nordufer, Bootsanleger …" />
     </div>
 
-    <!-- 2. Uhrzeit -->
+    <!-- 2. Angler -->
+    <div class="form-group">
+      <label>Angler</label>
+      <input type="text" id="f-angler" placeholder="z. B. Lars" />
+    </div>
+
+    <!-- 3. Uhrzeit -->
     <div class="form-group">
       <label>Uhrzeit</label>
       <input type="datetime-local" id="f-time" />
@@ -631,6 +637,9 @@
       </div>
       <div class="detail-row" id="d-temps">
         <span class="dr-icon">🌡</span><span class="dr-val"></span>
+      </div>
+      <div class="detail-row" id="d-angler" style="display:none">
+        <span class="dr-icon">🎣</span><span class="dr-val"></span>
       </div>
       <div class="detail-row" id="d-notes" style="display:none">
         <span class="dr-icon">📝</span><span class="dr-val"></span>
@@ -960,6 +969,7 @@ async function saveCatch() {
     air_temp:   parseFloat(document.getElementById('f-airtemp').value)   || null,
     watertemp:  parseFloat(document.getElementById('f-watertemp').value) || null,
     spotname:   document.getElementById('f-spotname').value.trim()       || null,
+    angler:     document.getElementById('f-angler').value.trim()         || null,
     notes:      document.getElementById('f-notes').value.trim()          || null,
     lat: selectedLat,
     lng: selectedLng,
@@ -999,7 +1009,7 @@ function setSaving(s) {
 
 function clearForm() {
   ['f-species','f-bait-type','f-bait-name','f-weather',
-   'f-weight','f-length','f-airtemp','f-watertemp','f-spotname','f-notes']
+   'f-weight','f-length','f-airtemp','f-watertemp','f-spotname','f-angler','f-notes']
     .forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('airtemp-val').textContent = '–';
   clearPhoto();
@@ -1046,6 +1056,7 @@ function entryHTML(c) {
         🪱 ${escHtml(bait)}<br>
         ${escHtml(c.weather)}${temps ? ' · ' + temps : ''}
         ${spotStr ? '<br>' + escHtml(spotStr) : ''}
+        ${c.angler ? '<br>🎣 ' + escHtml(c.angler) : ''}
         ${c.notes ? '<br>📝 ' + escHtml(c.notes) : ''}
       </div>
       ${c.photo_url ? `<img class="entry-photo" src="${c.photo_url}" alt="Fangfoto" loading="lazy" onclick="event.stopPropagation();window.open('${c.photo_url}','_blank')" />` : ''}
@@ -1126,6 +1137,14 @@ function showDetail(id) {
   document.querySelector('#d-bait .dr-val').textContent    = bait;
   document.querySelector('#d-weather .dr-val').textContent = c.weather || '–';
   document.querySelector('#d-temps .dr-val').textContent   = temps || '–';
+
+  const anglerRow = document.getElementById('d-angler');
+  if (c.angler) {
+    anglerRow.style.display = 'flex';
+    anglerRow.querySelector('.dr-val').textContent = c.angler;
+  } else {
+    anglerRow.style.display = 'none';
+  }
 
   const notesRow = document.getElementById('d-notes');
   if (c.notes) {
@@ -1226,7 +1245,7 @@ function renderToplist() {
     const d = new Date(c.time);
     const date = d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'2-digit' });
     const size = c.weight ? `${c.weight} g` : (c.length ? `${c.length} cm` : '–');
-    const sub  = [c.length && c.weight ? `${c.length} cm` : '', date, c.spotname || ''].filter(Boolean).join(' · ');
+    const sub  = [c.length && c.weight ? `${c.length} cm` : '', date, c.spotname || '', c.angler ? '🎣 ' + c.angler : ''].filter(Boolean).join(' · ');
     const bait = c.bait_name ? `${c.bait_type ? c.bait_type + ' – ' : ''}${c.bait_name}` : '';
     return `<div class="top-row">
       <span class="top-rank">#${i+1}</span>
