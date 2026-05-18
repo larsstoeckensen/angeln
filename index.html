@@ -492,7 +492,7 @@
 
     <!-- 2. Angler -->
     <div class="form-group">
-      <label>Angler</label>
+      <label>Angler <span style="color:#3a6a3a;font-size:.72rem;text-transform:none;letter-spacing:0">(wird auf diesem Gerät gespeichert)</span></label>
       <input type="text" id="f-angler" placeholder="z. B. Lars" />
     </div>
 
@@ -919,6 +919,10 @@ async function openModal() {
   document.getElementById('f-time').value =
     `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
+  // Angler-Name aus localStorage vorausfüllen
+  const savedAngler = localStorage.getItem('angler_name');
+  if (savedAngler) document.getElementById('f-angler').value = savedAngler;
+
   // Spot-Info im Modal aktualisieren
   document.getElementById('modal-spot-text').textContent = selectedLat
     ? `${selectedLat.toFixed(5)}, ${selectedLng.toFixed(5)}`
@@ -969,7 +973,7 @@ async function saveCatch() {
     air_temp:   parseFloat(document.getElementById('f-airtemp').value)   || null,
     watertemp:  parseFloat(document.getElementById('f-watertemp').value) || null,
     spotname:   document.getElementById('f-spotname').value.trim()       || null,
-    angler:     document.getElementById('f-angler').value.trim()         || null,
+    angler:     (() => { const v = document.getElementById('f-angler').value.trim(); if (v) localStorage.setItem('angler_name', v); return v || null; })(),
     notes:      document.getElementById('f-notes').value.trim()          || null,
     lat: selectedLat,
     lng: selectedLng,
